@@ -29,8 +29,19 @@ class UserRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_user_by_id(self, user_id: int) -> UserModel | None:
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def update_avatar(self, user: UserModel, avatar_url: str) -> UserModel:
         user.avatar = avatar_url
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    async def update_password(self, user: UserModel, hashed_password: str) -> UserModel:
+        user.password = hashed_password
         await self.db.commit()
         await self.db.refresh(user)
         return user

@@ -40,6 +40,19 @@ class AuthService:
         )
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM), expire
 
+    def create_password_reset_token(self, data: dict) -> tuple[str, datetime]:
+        to_encode = data.copy()
+        now = datetime.now(timezone.utc)
+        expire = now + timedelta(hours=1)
+        to_encode.update(
+            {
+                "iat": now,
+                "exp": expire,
+                "scope": "password_reset",
+            }
+        )
+        return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM), expire
+
     def decode_email_token(self, token: str) -> str:
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -75,6 +88,28 @@ class AuthService:
             return email
         except JWTError as error:
             raise credentials_exception from error
+
+    def decode_password_reset_token(self, token: str) -> tuple[str, int]:
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            if payload.get("scope") != "password_reset":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid token scope for password reset",
+                )
+            email = payload.get("sub")
+            user_id = payload.get("uid")
+            if email is None or user_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid token payload",
+                )
+            return str(email), int(user_id)
+        except JWTError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid or expired password reset token",
+            ) from error
 
 
 auth_service = AuthService()

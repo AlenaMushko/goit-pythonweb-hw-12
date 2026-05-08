@@ -5,4 +5,12 @@ from .contact_schemas import (
     ContactResponse,
     ContactUpdate,
 )
-from .user_schemas import RequestEmail, Token, UserBase, UserCreate, UserLogin, UserResponse
+from .user_schemas import (
+    PasswordResetConfirm,
+    RequestEmail,
+    Token,
+    UserBase,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)

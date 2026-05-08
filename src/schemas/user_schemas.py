@@ -79,3 +79,28 @@ class UserLogin(BaseModel):
 
 class RequestEmail(BaseModel):
     email: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    user_id: int
+    password: str = Field(min_length=8, max_length=255)
+    confirm_password: str = Field(min_length=8, max_length=255)
+
+    @field_validator("password", "confirm_password", mode="before")
+    @classmethod
+    def trim_password_fields(cls, value):
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("password", "confirm_password")
+    @classmethod
+    def validate_password_fields(cls, value: str) -> str:
+        if not value:
+            raise ValueError("Password is required")
+        if not re.match(PASSWORD_REGEX, value):
+            raise ValueError(
+                "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+            )
+        return value

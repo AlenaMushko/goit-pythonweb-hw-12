@@ -1,16 +1,33 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+import re
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.conf.constants import AUTH_PREFIX, CONFIRMED_EMAIL_PATH
+from src.conf.constants import (
+    AUTH_PREFIX,
+    CONFIRMED_EMAIL_PATH,
+    PASSWORD_REGEX,
+    RESET_PASSWORD_CONFIRM_PATH,
+    RESET_PASSWORD_PATH,
+)
 from src.db.session import get_db
 from src.models.token_model import TokenType
 from src.repositories.auth_repository import AuthRepository
 from src.repositories.token_repository import TokenRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user_schemas import RequestEmail, Token, UserCreate, UserLogin, UserResponse
+from src.schemas.user_schemas import (
+    PasswordResetConfirm,
+    RequestEmail,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from src.security.passwords import get_password_hash, verify_password
 from src.services.auth_service import auth_service
-from src.services.email_service import send_verification_email
+from src.services.email_service import send_password_reset_email, send_verification_email
+from src.services.password_reset_page_service import render_password_reset_page
 
 router = APIRouter(prefix=AUTH_PREFIX, tags=["auth"])
 
@@ -132,3 +149,172 @@ async def request_email_verification(
     return {
         "message": "If an account with this email exists and is not yet verified, a verification link has been sent"
     }
+
+
+@router.post(RESET_PASSWORD_PATH, status_code=status.HTTP_200_OK)
+async def request_password_reset(
+    body: RequestEmail, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
+):
+    user_repository = UserRepository(db)
+    user = await user_repository.get_user_by_email(body.email)
+
+    if user:
+        user_id = user.id
+        user_email = user.email
+        user_fullname = f"{user.first_name} {user.last_name}".strip()
+        token_repository = TokenRepository(db)
+        await token_repository.delete_user_tokens_by_type(user_id, TokenType.PASSWORD_RESET)
+        reset_token, reset_token_expires_at = auth_service.create_password_reset_token(
+            {"sub": user_email, "uid": user_id}
+        )
+        await token_repository.create_token(
+            reset_token,
+            user_id,
+            TokenType.PASSWORD_RESET,
+            reset_token_expires_at,
+        )
+
+        background_tasks.add_task(send_password_reset_email, user_email, reset_token, user_fullname)
+
+    return {
+        "message": "If an account with this email exists, password reset instructions have been sent"
+    }
+
+
+@router.get(f"{RESET_PASSWORD_PATH}/{{token}}", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
+async def validate_password_reset_token(token: str, db: AsyncSession = Depends(get_db)):
+    token_repository = TokenRepository(db)
+    active_token = await token_repository.get_active_token(token, TokenType.PASSWORD_RESET)
+    if active_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token is invalid, expired, or already used",
+        )
+
+    _, user_id = auth_service.decode_password_reset_token(token)
+    return render_password_reset_page(
+        token=token,
+        user_id=user_id,
+        message="Token is valid. Enter your new password below.",
+    )
+
+
+@router.post(f"{RESET_PASSWORD_PATH}/{{token}}", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
+async def submit_password_reset_form(
+    token: str,
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    user_id: int | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+
+    print(f'submit_password_reset_form: password: {password}')
+    print(f'submit_password_reset_form: confirm_password: {confirm_password}')
+    print(f'submit_password_reset_form: user_id: {user_id}')
+
+    if password != confirm_password:
+        return HTMLResponse(
+            render_password_reset_page(
+                token=token,
+                user_id=user_id,
+                message="Password and confirm password do not match.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    token_repository = TokenRepository(db)
+    active_token = await token_repository.get_active_token(token, TokenType.PASSWORD_RESET)
+    if active_token is None:
+        return HTMLResponse(
+            render_password_reset_page(
+                token=token,
+                message="Password reset token is invalid, expired, or already used.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    token_email, token_user_id = auth_service.decode_password_reset_token(token)
+    if user_id is not None and user_id != token_user_id:
+        return HTMLResponse(
+            render_password_reset_page(
+                token=token,
+                user_id=user_id,
+                message="Token does not belong to provided user.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user_repository = UserRepository(db)
+    user = await user_repository.get_user_by_id(token_user_id)
+    if user is None or user.email != token_email:
+        return HTMLResponse(
+            render_password_reset_page(
+                token=token,
+                message="User for this token was not found.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    cleaned_password = password.strip()
+    if not re.match(PASSWORD_REGEX, cleaned_password):
+        return HTMLResponse(
+            render_password_reset_page(
+                token=token,
+                user_id=token_user_id,
+                message="Password must contain uppercase, lowercase, and number.",
+            ),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    hashed_password = get_password_hash(cleaned_password)
+    user_id = user.id
+    await user_repository.update_password(user, hashed_password)
+    await token_repository.delete_token(active_token)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+
+    return HTMLResponse(
+        render_password_reset_page(
+            token=token,
+            message="Password has been reset successfully. You can close this page and log in.",
+        )
+    )
+
+
+@router.post(RESET_PASSWORD_CONFIRM_PATH, status_code=status.HTTP_200_OK)
+async def confirm_password_reset(body: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
+    if body.password != body.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password and confirm password do not match",
+        )
+
+    token_repository = TokenRepository(db)
+    active_token = await token_repository.get_active_token(body.token, TokenType.PASSWORD_RESET)
+    if active_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token is invalid, expired, or already used",
+        )
+
+    token_email, token_user_id = auth_service.decode_password_reset_token(body.token)
+    if token_user_id != body.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token does not belong to provided user",
+        )
+
+    user_repository = UserRepository(db)
+    user = await user_repository.get_user_by_id(body.user_id)
+    if user is None or user.email != token_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User for this token was not found",
+        )
+
+    hashed_password = get_password_hash(body.password)
+    user_id = user.id
+    await user_repository.update_password(user, hashed_password)
+    await token_repository.delete_token(active_token)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+
+    return {"message": "Password has been reset successfully"}

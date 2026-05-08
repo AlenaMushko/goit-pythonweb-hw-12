@@ -10,6 +10,7 @@ from src.db.base import Base
 class TokenType(str, Enum):
     ACCESS = "access"
     EMAIL_VERIFICATION = "email_verification"
+    PASSWORD_RESET = "password_reset"
 
 
 class TokenModel(Base):
