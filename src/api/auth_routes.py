@@ -18,6 +18,7 @@ from src.repositories.token_repository import TokenRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user_schemas import (
     PasswordResetConfirm,
+    RefreshTokenRequest,
     RequestEmail,
     Token,
     UserCreate,
@@ -88,14 +89,74 @@ async def login(
     user_email = user.email
     token_repository = TokenRepository(db)
     await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.REFRESH)
     access_token, access_token_expires_at = auth_service.create_access_token(data={"sub": user_email})
+    refresh_token, refresh_token_expires_at = auth_service.create_refresh_token(data={"sub": user_email})
     await token_repository.create_token(
         access_token,
         user_id,
         TokenType.ACCESS,
         access_token_expires_at,
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    await token_repository.create_token(
+        refresh_token,
+        user_id,
+        TokenType.REFRESH,
+        refresh_token_expires_at,
+    )
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+async def refresh_access_token(
+    body: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    user_email = auth_service.decode_refresh_token(body.refresh_token)
+    token_repository = TokenRepository(db)
+    active_refresh_token = await token_repository.get_active_token(body.refresh_token, TokenType.REFRESH)
+    if active_refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid, expired, or revoked",
+        )
+
+    user_repository = UserRepository(db)
+    user = await user_repository.get_user_by_email(user_email)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found for refresh token",
+        )
+
+    user_id = user.id
+    new_access_token, access_expires_at = auth_service.create_access_token(data={"sub": user_email})
+    new_refresh_token, refresh_expires_at = auth_service.create_refresh_token(data={"sub": user_email})
+
+    await token_repository.delete_token(active_refresh_token)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+    await token_repository.create_token(
+        new_access_token,
+        user_id,
+        TokenType.ACCESS,
+        access_expires_at,
+    )
+    await token_repository.create_token(
+        new_refresh_token,
+        user_id,
+        TokenType.REFRESH,
+        refresh_expires_at,
+    )
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.get(f"{CONFIRMED_EMAIL_PATH}/{{token}}")
@@ -207,11 +268,6 @@ async def submit_password_reset_form(
     user_id: int | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
-
-    print(f'submit_password_reset_form: password: {password}')
-    print(f'submit_password_reset_form: confirm_password: {confirm_password}')
-    print(f'submit_password_reset_form: user_id: {user_id}')
-
     if password != confirm_password:
         return HTMLResponse(
             render_password_reset_page(
@@ -271,6 +327,7 @@ async def submit_password_reset_form(
     await user_repository.update_password(user, hashed_password)
     await token_repository.delete_token(active_token)
     await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.REFRESH)
 
     return HTMLResponse(
         render_password_reset_page(
@@ -316,5 +373,6 @@ async def confirm_password_reset(body: PasswordResetConfirm, db: AsyncSession = 
     await user_repository.update_password(user, hashed_password)
     await token_repository.delete_token(active_token)
     await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.REFRESH)
 
     return {"message": "Password has been reset successfully"}

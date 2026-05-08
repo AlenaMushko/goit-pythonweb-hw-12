@@ -23,7 +23,16 @@ class AuthService:
         expire = datetime.now(timezone.utc) + (
             expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": expire, "scope": "access"})
+        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        return encoded_jwt, expire
+
+    def create_refresh_token(self, data: dict, expires_delta: timedelta | None = None) -> tuple[str, datetime]:
+        to_encode = data.copy()
+        expire = datetime.now(timezone.utc) + (
+            expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        to_encode.update({"exp": expire, "scope": "refresh"})
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         return encoded_jwt, expire
 
@@ -43,7 +52,7 @@ class AuthService:
     def create_password_reset_token(self, data: dict) -> tuple[str, datetime]:
         to_encode = data.copy()
         now = datetime.now(timezone.utc)
-        expire = now + timedelta(hours=1)
+        expire = now + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
         to_encode.update(
             {
                 "iat": now,
@@ -82,6 +91,25 @@ class AuthService:
         )
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            if payload.get("scope") != "access":
+                raise credentials_exception
+            email: str | None = payload.get("sub")
+            if email is None:
+                raise credentials_exception
+            return email
+        except JWTError as error:
+            raise credentials_exception from error
+
+    def decode_refresh_token(self, token: str) -> str:
+        credentials_exception = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            if payload.get("scope") != "refresh":
+                raise credentials_exception
             email: str | None = payload.get("sub")
             if email is None:
                 raise credentials_exception
@@ -127,6 +155,8 @@ async def get_current_user(
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("scope") != "access":
+            raise credentials_exception
         email: str | None = payload.get("sub")
         if email is None:
             raise credentials_exception

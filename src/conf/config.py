@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
 
     MAIL_USERNAME: str | None = None
     MAIL_PASSWORD: str | None = None

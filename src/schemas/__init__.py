@@ -7,6 +7,7 @@ from .contact_schemas import (
 )
 from .user_schemas import (
     PasswordResetConfirm,
+    RefreshTokenRequest,
     RequestEmail,
     Token,
     UserBase,
