@@ -26,7 +26,9 @@ from src.schemas.user_schemas import (
     UserResponse,
 )
 from src.security.passwords import get_password_hash, verify_password
+from src.schemas.current_user import user_to_cache_payload
 from src.services.auth_service import auth_service
+from src.services.redis_service import set_user_cache
 from src.services.email_service import send_password_reset_email, send_verification_email
 from src.services.password_reset_page_service import render_password_reset_page
 
@@ -131,6 +133,7 @@ async def login(
         TokenType.REFRESH,
         refresh_token_expires_at,
     )
+    await set_user_cache(user_email, user_to_cache_payload(user))
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.user_model import UserModel
 from src.models.user_role import UserRole
 from src.schemas.user_schemas import UserCreate
+from src.services.redis_service import delete_user_cache
 
 
 class UserRepository:
@@ -84,6 +85,7 @@ class UserRepository:
         user.avatar = avatar_url
         await self.db.commit()
         await self.db.refresh(user)
+        await delete_user_cache(user.email)
         return user
 
     async def update_password(self, user: UserModel, hashed_password: str) -> UserModel:
@@ -100,4 +102,5 @@ class UserRepository:
         user.password = hashed_password
         await self.db.commit()
         await self.db.refresh(user)
+        await delete_user_cache(user.email)
         return user

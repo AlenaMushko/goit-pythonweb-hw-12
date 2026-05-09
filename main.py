@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from src.api import auth_routes, contact_routes, health, user_routes
 from src.conf.config import origins, settings
 from src.conf.constants import API_PREFIX
+from src.services.redis_service import close_redis, init_redis
 from src.utils.rate_limiter import limiter
 from src.utils.token_cleanup import token_cleanup_loop
 
@@ -20,6 +21,7 @@ app.state.token_cleanup_task = None
 
 @app.on_event("startup")
 async def startup_cleanup_worker() -> None:
+    await init_redis()
     app.state.token_cleanup_task = asyncio.create_task(token_cleanup_loop())
 
 
@@ -30,6 +32,7 @@ async def shutdown_cleanup_worker() -> None:
         cleanup_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await cleanup_task
+    await close_redis()
 
 app.add_middleware(
     CORSMiddleware,

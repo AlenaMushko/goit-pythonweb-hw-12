@@ -11,6 +11,8 @@ from src.models.token_model import TokenType
 from src.models.user_model import UserModel
 from src.repositories.token_repository import TokenRepository
 from src.repositories.user_repository import UserRepository
+from src.schemas.current_user import CurrentUser, current_user_from_cache, user_to_cache_payload
+from src.services.redis_service import get_user_cache, set_user_cache
 
 bearer_scheme = HTTPBearer()
 
@@ -233,7 +235,7 @@ auth_service = AuthService()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
-) -> UserModel:
+) -> UserModel | CurrentUser:
     """
     Resolve current authenticated user from bearer access token.
 
@@ -268,8 +270,15 @@ async def get_current_user(
     if active_access_token is None:
         raise credentials_exception
 
+    cached_user = await get_user_cache(email)
+    if cached_user is not None:
+        parsed = current_user_from_cache(cached_user)
+        if parsed is not None:
+            return parsed
+
     user_repository = UserRepository(db)
     user = await user_repository.get_user_by_email(email)
     if user is None:
         raise credentials_exception
+    await set_user_cache(email, user_to_cache_payload(user))
     return user

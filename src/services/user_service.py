@@ -9,6 +9,7 @@ from src.conf.config import settings
 from src.conf.constants import ALLOWED_AVATAR_CONTENT_TYPES, MAX_AVATAR_SIZE_BYTES
 from src.models.user_model import UserModel
 from src.repositories.user_repository import UserRepository
+from src.schemas.current_user import CurrentUser
 from src.services.upload_file_service import UploadFileService
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class UserService:
         """
         self.repository = UserRepository(db)
 
-    async def update_avatar(self, file: UploadFile, current_user: UserModel):
+    async def update_avatar(self, file: UploadFile, current_user: UserModel | CurrentUser):
         """
         Validate, upload, and persist user avatar.
 
@@ -39,6 +40,13 @@ class UserService:
         Raises:
             HTTPException: If file validation or upload fails.
         """
+        db_user = await self.repository.get_user_by_id(current_user.id)
+        if db_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,12 +90,12 @@ class UserService:
             temp_path = temp_file.name
 
         try:
-            public_id = UploadFileService.get_avatar_public_id(current_user.id)
-            if current_user.avatar:
+            public_id = UploadFileService.get_avatar_public_id(db_user.id)
+            if db_user.avatar:
                 UploadFileService.delete_avatar(public_id)
             avatar_url = UploadFileService.upload_avatar(temp_path, public_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Avatar upload failed for user_id=%s", current_user.id)
+        except Exception as exc:
+            logger.exception("Avatar upload failed for user_id=%s", db_user.id)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Failed to upload avatar to cloud storage",
@@ -96,4 +104,4 @@ class UserService:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-        return await self.repository.update_avatar(current_user, avatar_url)
+        return await self.repository.update_avatar(db_user, avatar_url)

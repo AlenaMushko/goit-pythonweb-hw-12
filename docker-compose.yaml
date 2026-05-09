@@ -17,12 +17,31 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    container_name: ${REDIS_CONTAINER_NAME:-hw_10-redis}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change_me_redis_password}"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
+
   app:
     build: .
     container_name: ${APP_CONTAINER_NAME:-hw_10-app-container}
     restart: always
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "5001:8003"
@@ -47,9 +66,15 @@ services:
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       TOKEN_CLEANUP_INTERVAL_SECONDS: ${TOKEN_CLEANUP_INTERVAL_SECONDS:-604800}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
+      REDIS_USER_CACHE_TTL_SECONDS: ${REDIS_USER_CACHE_TTL_SECONDS:-3600}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-hw10}
     volumes:
       - .:/hw_10-app-container
 
 volumes:
   postgres_data:
+  redis_data:

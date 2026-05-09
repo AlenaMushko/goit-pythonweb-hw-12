@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = "5432"
 
     DATABASE_URL: str
+    REDIS_HOST: str = "127.0.0.1"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str | None = None
+    REDIS_USER_CACHE_TTL_SECONDS: int = 3600
 
     APP_CONTAINER_NAME: str
     APP_HOST: str
@@ -49,6 +54,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+
+    @property
+    def REDIS_URL(self) -> str:
+        """Build redis connection URL from settings."""
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
 
 settings = Settings()
