@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 
 
+# revision identifiers, used by Alembic.
 revision: str = "b2f6d9a4c8aa"
 down_revision: Union[str, Sequence[str], None] = "a1c4f4be92d1"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -23,4 +24,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    # PostgreSQL does not support removing enum values safely in-place.
     pass
