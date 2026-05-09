@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
     POSTGRES_CONTAINER_NAME: str
 
     POSTGRES_USER: str

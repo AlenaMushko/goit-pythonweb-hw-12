@@ -22,6 +22,17 @@ async def create_contact(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Create a new contact for authenticated user.
+
+    Args:
+        body: Contact creation payload.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Created contact object.
+    """
     service = ContactService(db)
     return await service.create_contact(body, current_user)
 
@@ -36,6 +47,21 @@ async def get_all_contacts(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Return contacts list or filtered search results.
+
+    Args:
+        skip: Number of contacts to skip.
+        limit: Maximum number of contacts to return.
+        name: Optional name filter.
+        surname: Optional surname filter.
+        email: Optional email filter.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        List of contacts matching requested criteria.
+    """
     service = ContactService(db)
 
     if name or surname or email:
@@ -52,6 +78,17 @@ async def get_upcoming_birthdays(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Return contacts with upcoming birthdays.
+
+    Args:
+        days: Number of upcoming days to inspect.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        List of contacts with congratulation dates.
+    """
     service = ContactService(db)
     return await service.get_upcoming_birthdays(user=current_user, days=days)
 
@@ -62,6 +99,17 @@ async def read_contact_by_id(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Return one contact by identifier.
+
+    Args:
+        contact_id: Contact identifier.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Contact object.
+    """
     service = ContactService(db)
     return await service.get_contact_by_id(contact_id, current_user)
 
@@ -73,6 +121,18 @@ async def update_contact(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Partially update existing contact.
+
+    Args:
+        body: Contact update payload.
+        contact_id: Contact identifier.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Updated contact object.
+    """
     service = ContactService(db)
     return await service.update_contact(contact_id, body, current_user)
 
@@ -83,5 +143,16 @@ async def remove_contact(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Delete contact by identifier.
+
+    Args:
+        contact_id: Contact identifier.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Deleted contact object.
+    """
     service = ContactService(db)
     return await service.remove_contact(contact_id, current_user)

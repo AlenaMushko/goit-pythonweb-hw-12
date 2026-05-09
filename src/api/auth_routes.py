@@ -39,6 +39,20 @@ async def signup(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Register a new user and send verification email.
+
+    Args:
+        body: User registration payload.
+        background_tasks: FastAPI background task manager.
+        db: Active asynchronous database session.
+
+    Returns:
+        Created user object.
+
+    Raises:
+        HTTPException: If account with email already exists.
+    """
     user_repository = UserRepository(db)
     existing_user = await user_repository.get_user_by_email(body.email)
     if existing_user:
@@ -71,6 +85,19 @@ async def login(
     body: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Authenticate user and issue access and refresh tokens.
+
+    Args:
+        body: User login credentials.
+        db: Active asynchronous database session.
+
+    Returns:
+        Token response payload with access and refresh tokens.
+
+    Raises:
+        HTTPException: If credentials are invalid or email is unverified.
+    """
     user_repository = UserRepository(db)
     user = await user_repository.get_user_by_email(body.email)
 
@@ -116,6 +143,19 @@ async def refresh_access_token(
     body: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Rotate refresh token and return a fresh token pair.
+
+    Args:
+        body: Refresh token request payload.
+        db: Active asynchronous database session.
+
+    Returns:
+        New access and refresh tokens.
+
+    Raises:
+        HTTPException: If refresh token is invalid or user is missing.
+    """
     user_email = auth_service.decode_refresh_token(body.refresh_token)
     token_repository = TokenRepository(db)
     active_refresh_token = await token_repository.get_active_token(body.refresh_token, TokenType.REFRESH)
@@ -161,6 +201,19 @@ async def refresh_access_token(
 
 @router.get(f"{CONFIRMED_EMAIL_PATH}/{{token}}")
 async def confirmed_email(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    Confirm user email by verification token.
+
+    Args:
+        token: Email verification token.
+        db: Active asynchronous database session.
+
+    Returns:
+        Message payload about verification status.
+
+    Raises:
+        HTTPException: If token or user is invalid.
+    """
     token_repository = TokenRepository(db)
     active_email_token = await token_repository.get_active_token(token, TokenType.EMAIL_VERIFICATION)
     if active_email_token is None:
@@ -191,6 +244,17 @@ async def confirmed_email(token: str, db: AsyncSession = Depends(get_db)):
 async def request_email_verification(
     body: RequestEmail, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
 ):
+    """
+    Resend verification email for unverified account.
+
+    Args:
+        body: Payload with user email.
+        background_tasks: FastAPI background task manager.
+        db: Active asynchronous database session.
+
+    Returns:
+        Generic success message payload.
+    """
     user_repository = UserRepository(db)
     user = await user_repository.get_user_by_email(body.email)
     if user and not user.is_verified:
@@ -216,6 +280,17 @@ async def request_email_verification(
 async def request_password_reset(
     body: RequestEmail, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
 ):
+    """
+    Issue password reset token and send reset email.
+
+    Args:
+        body: Payload with user email.
+        background_tasks: FastAPI background task manager.
+        db: Active asynchronous database session.
+
+    Returns:
+        Generic success message payload.
+    """
     user_repository = UserRepository(db)
     user = await user_repository.get_user_by_email(body.email)
 
@@ -244,6 +319,19 @@ async def request_password_reset(
 
 @router.get(f"{RESET_PASSWORD_PATH}/{{token}}", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
 async def validate_password_reset_token(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    Validate reset token and return HTML reset page.
+
+    Args:
+        token: Password reset token.
+        db: Active asynchronous database session.
+
+    Returns:
+        HTML page with password reset form.
+
+    Raises:
+        HTTPException: If reset token is invalid or expired.
+    """
     token_repository = TokenRepository(db)
     active_token = await token_repository.get_active_token(token, TokenType.PASSWORD_RESET)
     if active_token is None:
@@ -268,6 +356,19 @@ async def submit_password_reset_form(
     user_id: int | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Handle password reset form submission from HTML page.
+
+    Args:
+        token: Password reset token.
+        password: New password value.
+        confirm_password: Confirmation password value.
+        user_id: Optional user identifier from form.
+        db: Active asynchronous database session.
+
+    Returns:
+        HTML page with operation result message.
+    """
     if password != confirm_password:
         return HTMLResponse(
             render_password_reset_page(
@@ -339,6 +440,19 @@ async def submit_password_reset_form(
 
 @router.post(RESET_PASSWORD_CONFIRM_PATH, status_code=status.HTTP_200_OK)
 async def confirm_password_reset(body: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
+    """
+    Reset user password using JSON payload and reset token.
+
+    Args:
+        body: Password reset confirmation payload.
+        db: Active asynchronous database session.
+
+    Returns:
+        Success message payload.
+
+    Raises:
+        HTTPException: If token or payload validation fails.
+    """
     if body.password != body.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -18,7 +18,9 @@ _LEVEL_COLORS = {
 
 
 class ColoredFormatter(logging.Formatter):
+    """Formatter that renders colored log lines in terminal output."""
     def format(self, record: logging.LogRecord) -> str:
+        """Return formatted log record with colorized level and message."""
         if record.name == APP_LOGGER_NAME:
             ts = self.formatTime(record, self.datefmt)
             level_color = _LEVEL_COLORS.get(record.levelno, "")
@@ -51,6 +53,7 @@ class ColoredFormatter(logging.Formatter):
 
 
 def _quiet_sqlalchemy_loggers() -> None:
+    """Reduce SQLAlchemy logger noise to warning level."""
     for name in (
         "sqlalchemy.engine",
         "sqlalchemy.pool",
@@ -60,9 +63,11 @@ def _quiet_sqlalchemy_loggers() -> None:
 
 
 class Logger:
+    """Singleton wrapper around project logger instance."""
     _instance = None
 
     def __new__(cls, *args, **kwargs):
+        """Create or return singleton logger instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             _quiet_sqlalchemy_loggers()
@@ -84,6 +89,7 @@ class Logger:
         return cls._instance
 
     def debug(self, message: str) -> None:
+        """Log DEBUG level message."""
         self._log.debug(message)
 
     def info(self, message: str, *, title: str | None = None) -> None:
@@ -105,6 +111,7 @@ class Logger:
         *,
         title: str | None,
     ) -> None:
+        """Emit message via log function with optional title metadata."""
         if title:
             log_fn(message, extra={"log_title": title})
         else:

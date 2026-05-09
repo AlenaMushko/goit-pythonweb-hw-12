@@ -15,6 +15,7 @@ from src.models.user_role import UserRole
 
 
 class UserModel(Base):
+    """SQLAlchemy model for application users."""
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
@@ -37,18 +38,21 @@ class UserModel(Base):
 
     @validates("first_name")
     def validate_first_name(self, key, value: str) -> str:
+        """Validate non-empty first name."""
         if value.strip() == "":
             raise ValueError("First name cannot be empty")
         return value
 
     @validates("last_name")
     def validate_last_name(self, key, value: str) -> str:
+        """Validate non-empty last name."""
         if value.strip() == "":
             raise ValueError("Last name cannot be empty")
         return value
 
     @validates("email")
     def validate_email(self, key, value: str) -> str:
+        """Validate email presence and format."""
         if value.strip() == "":
             raise ValueError("Email cannot be empty")
         if not re.match(EMAIL_REGEX, value):
@@ -57,6 +61,7 @@ class UserModel(Base):
 
     @validates("password")
     def validate_password(self, key, value: str) -> str:
+        """Validate password against configured regex."""
         if value.strip() == "":
             raise ValueError("Password cannot be empty")
         if not re.match(PASSWORD_REGEX, value):
@@ -66,4 +71,5 @@ class UserModel(Base):
         return value
 
     def __repr__(self) -> str:
+        """Return concise debug representation."""
         return f"UserModel(id={self.id}, user_name={self.first_name + ' ' + self.last_name})"

@@ -2,6 +2,7 @@ from html import escape
 
 
 def render_password_reset_page(token: str, user_id: int | None = None, message: str = "") -> str:
+    """Render HTML page for password reset form submission."""
     safe_message = escape(message) if message else ""
     hidden_user_id = (
         f'<input type="hidden" name="user_id" value="{user_id}" />' if user_id is not None else ""

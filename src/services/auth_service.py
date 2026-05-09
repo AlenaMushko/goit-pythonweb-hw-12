@@ -16,9 +16,20 @@ bearer_scheme = HTTPBearer()
 
 
 class AuthService:
+    """Service for creating and validating authentication tokens."""
     def create_access_token(
         self, data: dict, expires_delta: timedelta | None = None
     ) -> tuple[str, datetime]:
+        """
+        Create an access JWT token.
+
+        Args:
+            data: Payload data to encode into the token.
+            expires_delta: Optional custom token lifetime.
+
+        Returns:
+            Tuple containing encoded token string and expiration datetime.
+        """
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + (
             expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -28,6 +39,16 @@ class AuthService:
         return encoded_jwt, expire
 
     def create_refresh_token(self, data: dict, expires_delta: timedelta | None = None) -> tuple[str, datetime]:
+        """
+        Create a refresh JWT token.
+
+        Args:
+            data: Payload data to encode into the token.
+            expires_delta: Optional custom token lifetime.
+
+        Returns:
+            Tuple containing encoded token string and expiration datetime.
+        """
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + (
             expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
@@ -37,6 +58,15 @@ class AuthService:
         return encoded_jwt, expire
 
     def create_email_token(self, data: dict) -> tuple[str, datetime]:
+        """
+        Create a JWT token for email verification flow.
+
+        Args:
+            data: Payload data to encode into the token.
+
+        Returns:
+            Tuple containing encoded token string and expiration datetime.
+        """
         to_encode = data.copy()
         now = datetime.now(timezone.utc)
         expire = now + timedelta(days=7)
@@ -50,6 +80,15 @@ class AuthService:
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM), expire
 
     def create_password_reset_token(self, data: dict) -> tuple[str, datetime]:
+        """
+        Create a JWT token for password reset flow.
+
+        Args:
+            data: Payload data to encode into the token.
+
+        Returns:
+            Tuple containing encoded token string and expiration datetime.
+        """
         to_encode = data.copy()
         now = datetime.now(timezone.utc)
         expire = now + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
@@ -63,6 +102,18 @@ class AuthService:
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM), expire
 
     def decode_email_token(self, token: str) -> str:
+        """
+        Decode and validate email verification token.
+
+        Args:
+            token: Encoded JWT token.
+
+        Returns:
+            Email extracted from token payload.
+
+        Raises:
+            HTTPException: If token is invalid, expired, or has wrong scope.
+        """
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             if payload.get("scope") != "email_verification":
@@ -84,6 +135,18 @@ class AuthService:
             ) from error
 
     def decode_access_token(self, token: str) -> str:
+        """
+        Decode and validate access token.
+
+        Args:
+            token: Encoded JWT token.
+
+        Returns:
+            Email extracted from token payload.
+
+        Raises:
+            HTTPException: If token is invalid, expired, or has wrong scope.
+        """
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -101,6 +164,18 @@ class AuthService:
             raise credentials_exception from error
 
     def decode_refresh_token(self, token: str) -> str:
+        """
+        Decode and validate refresh token.
+
+        Args:
+            token: Encoded JWT token.
+
+        Returns:
+            Email extracted from token payload.
+
+        Raises:
+            HTTPException: If token is invalid, expired, or has wrong scope.
+        """
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
@@ -118,6 +193,18 @@ class AuthService:
             raise credentials_exception from error
 
     def decode_password_reset_token(self, token: str) -> tuple[str, int]:
+        """
+        Decode and validate password reset token.
+
+        Args:
+            token: Encoded JWT token.
+
+        Returns:
+            Tuple with email and user identifier from token payload.
+
+        Raises:
+            HTTPException: If token is invalid, expired, or has wrong scope.
+        """
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             if payload.get("scope") != "password_reset":
@@ -147,6 +234,19 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> UserModel:
+    """
+    Resolve current authenticated user from bearer access token.
+
+    Args:
+        credentials: Authorization credentials from request.
+        db: Active asynchronous database session.
+
+    Returns:
+        Authenticated user model.
+
+    Raises:
+        HTTPException: If token or user validation fails.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

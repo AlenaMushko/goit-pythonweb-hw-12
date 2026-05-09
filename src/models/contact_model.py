@@ -16,6 +16,7 @@ from src.conf.constants import (
 
 
 class ContactModel(Base):
+    """SQLAlchemy model for user contact records."""
     __tablename__ = "contacts"
     __table_args__ = (
         UniqueConstraint("email", name="uq_contacts_email"),
@@ -36,21 +37,25 @@ class ContactModel(Base):
 
     @validates("email")
     def validate_email(self, key, value: str) -> str:
+        """Validate contact email format."""
         if not re.match(EMAIL_REGEX, value):
             raise ValueError("Invalid email format")
         return value
 
     @validates("phone")
     def validate_phone(self, key, value: str) -> str:
+        """Validate contact phone format."""
         if not re.match(PHONE_REGEX, value):
             raise ValueError("Invalid phone format")
         return value
 
     @validates("birthday")
     def validate_birthday(self, key, value: date) -> date:
+        """Ensure birthday is not set in the future."""
         if value > date.today():
             raise ValueError("Birthday cannot be in the future")
         return value
 
     def __repr__(self) -> str:
+        """Return detailed debug representation."""
         return f"Contact(id={self.id!r}, name={self.name!r}, email={self.email!r}, phone={self.phone!r}, birthday={self.birthday!r}, additional_info={self.additional_info!r})"

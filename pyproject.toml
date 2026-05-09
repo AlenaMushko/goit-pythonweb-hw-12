@@ -34,5 +34,7 @@ build-backend = "poetry.core.masonry.api"
 dev = [
     "black (>=26.3.1,<27.0.0)",
     "pytest (>=9.0.3,<10.0.0)",
-    "httpx (>=0.28.1,<0.29.0)"
+    "httpx (>=0.28.1,<0.29.0)",
+    "sphinx (>=9.1.0,<10.0.0)",
+    "sphinx-rtd-theme (>=3.1.0,<4.0.0)"
 ]

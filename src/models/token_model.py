@@ -8,6 +8,7 @@ from src.db.base import Base
 
 
 class TokenType(str, Enum):
+    """Supported token types used in authentication workflows."""
     ACCESS = "access"
     REFRESH = "refresh"
     EMAIL_VERIFICATION = "email_verification"
@@ -15,6 +16,7 @@ class TokenType(str, Enum):
 
 
 class TokenModel(Base):
+    """SQLAlchemy model for persisted JWT tokens."""
     __tablename__ = "tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)

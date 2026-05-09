@@ -15,10 +15,30 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
+    """Business logic for user profile operations."""
     def __init__(self, db: AsyncSession):
+        """
+        Initialize service with dependencies.
+
+        Args:
+            db: Active asynchronous database session.
+        """
         self.repository = UserRepository(db)
 
     async def update_avatar(self, file: UploadFile, current_user: UserModel):
+        """
+        Validate, upload, and persist user avatar.
+
+        Args:
+            file: Uploaded image file.
+            current_user: User whose avatar should be updated.
+
+        Returns:
+            Updated user model with new avatar URL.
+
+        Raises:
+            HTTPException: If file validation or upload fails.
+        """
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

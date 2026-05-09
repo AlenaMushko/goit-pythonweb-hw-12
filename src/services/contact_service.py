@@ -10,11 +10,28 @@ from src.utils.logger import Logger
 
 
 class ContactService:
+    """Business logic for contact CRUD and birthday queries."""
     def __init__(self, db: AsyncSession):
+        """
+        Initialize contact service dependencies.
+
+        Args:
+            db: Active asynchronous database session.
+        """
         self.repository = ContactRepository(db)
         self.logger = Logger()
 
     async def create_contact(self, body: ContactCreate, user: UserModel):
+        """
+        Create contact and log creation event.
+
+        Args:
+            body: Contact creation payload.
+            user: Owner of the contact.
+
+        Returns:
+            Created contact model.
+        """
         contact = await self.repository.create_contact(body, user)
         self.logger.info(
             f"Contact created successfully: id={contact.id}, name={contact.name + ' ' + contact.surname}",
@@ -23,9 +40,33 @@ class ContactService:
         return contact
 
     async def get_all_contacts(self, user: UserModel, skip: int = 0, limit: int = 100):
+        """
+        Return paginated contacts for user.
+
+        Args:
+            user: Owner of contacts.
+            skip: Number of contacts to skip.
+            limit: Maximum number of contacts to return.
+
+        Returns:
+            List of contact models.
+        """
         return await self.repository.get_all_contacts(user, skip, limit)
 
     async def get_contact_by_id(self, contact_id: int, user: UserModel):
+        """
+        Return contact by id or raise 404.
+
+        Args:
+            contact_id: Contact identifier.
+            user: Owner of the contact.
+
+        Returns:
+            Contact model.
+
+        Raises:
+            HTTPException: If contact is not found.
+        """
         contact = await self.repository.get_contact_by_id(contact_id, user)
         if contact is None:
             raise HTTPException(
@@ -35,6 +76,20 @@ class ContactService:
         return contact
 
     async def update_contact(self, contact_id: int, body: ContactUpdate, user: UserModel):
+        """
+        Update contact and log update event.
+
+        Args:
+            contact_id: Contact identifier.
+            body: Contact update payload.
+            user: Owner of the contact.
+
+        Returns:
+            Updated contact model.
+
+        Raises:
+            HTTPException: If contact is not found.
+        """
         contact = await self.repository.update_contact(contact_id, body, user)
         if contact is None:
             raise HTTPException(
@@ -48,6 +103,19 @@ class ContactService:
         return contact
 
     async def remove_contact(self, contact_id: int, user: UserModel):
+        """
+        Delete contact and log delete event.
+
+        Args:
+            contact_id: Contact identifier.
+            user: Owner of the contact.
+
+        Returns:
+            Deleted contact model.
+
+        Raises:
+            HTTPException: If contact is not found.
+        """
         contact = await self.repository.remove_contact(contact_id, user)
         if contact is None:
             raise HTTPException(
@@ -69,14 +137,48 @@ class ContactService:
         skip: int = 0,
         limit: int = 100,
     ):
+        """
+        Search contacts by optional criteria.
+
+        Args:
+            name: Optional name filter.
+            surname: Optional surname filter.
+            email: Optional email filter.
+            user: Optional owner filter.
+            skip: Number of contacts to skip.
+            limit: Maximum number of contacts to return.
+
+        Returns:
+            List of matching contacts.
+        """
         return await self.repository.search_contacts_by_query(name, surname, email, user, skip, limit)
 
     async def get_upcoming_birthdays(self, user: UserModel, days: int = 7):
+        """
+        Return contacts with birthdays and congratulation dates.
+
+        Args:
+            user: Owner of contacts.
+            days: Number of upcoming days to inspect.
+
+        Returns:
+            List of upcoming birthday response objects.
+        """
         today = date.today()
         end_date = today + timedelta(days=days)
         contacts = await self.repository.get_upcoming_birthdays(today, end_date, user)
 
         def birthday_in_year(birth: date, year: int) -> date:
+            """
+            Project birthday into target year.
+
+            Args:
+                birth: Original birthday value.
+                year: Target year.
+
+            Returns:
+                Normalized date for target year.
+            """
             try:
                 return birth.replace(year=year)
             except ValueError:

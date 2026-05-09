@@ -8,6 +8,18 @@ router = APIRouter(tags=["health"])
 
 @router.get("/healthchecker")
 async def healthchecker(db: AsyncSession = Depends(get_db)):
+    """
+    Check API health by executing lightweight DB query.
+
+    Args:
+        db: Active asynchronous database session.
+
+    Returns:
+        Health status payload with success message.
+
+    Raises:
+        HTTPException: If database check fails.
+    """
     try:
         result = await db.execute(text("SELECT 1"))
         result = result.scalar_one_or_none()

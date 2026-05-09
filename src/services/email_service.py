@@ -31,6 +31,14 @@ conf = ConnectionConfig(
 
 
 async def send_verification_email(recipient_email: str, token: str, fullname: str = "") -> None:
+    """
+    Send account verification email with confirmation link.
+
+    Args:
+        recipient_email: Recipient email address.
+        token: Email verification token.
+        fullname: Optional recipient display name.
+    """
     base_host = settings.VERIFY_EMAIL_HOST.rstrip("/")
     verify_path = f"{API_PREFIX}{AUTH_PREFIX}{CONFIRMED_EMAIL_PATH}/{token}"
     verify_url = f"{base_host}{verify_path}"
@@ -65,6 +73,14 @@ async def send_verification_email(recipient_email: str, token: str, fullname: st
 
 
 async def send_password_reset_email(recipient_email: str, token: str, fullname: str = "") -> None:
+    """
+    Send password reset email with reset link.
+
+    Args:
+        recipient_email: Recipient email address.
+        token: Password reset token.
+        fullname: Optional recipient display name.
+    """
     base_host = settings.VERIFY_EMAIL_HOST.rstrip("/")
     reset_path = f"{API_PREFIX}{AUTH_PREFIX}{RESET_PASSWORD_PATH}/{token}"
     reset_url = f"{base_host}{reset_path}"

@@ -19,6 +19,16 @@ async def get_me(
     request: Request,
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Return profile data of the authenticated user.
+
+    Args:
+        request: Incoming HTTP request object.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Authenticated user profile.
+    """
     return current_user
 
 
@@ -28,6 +38,20 @@ async def update_avatar(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Upload and update avatar for admin user.
+
+    Args:
+        file: Uploaded image file.
+        db: Active asynchronous database session.
+        current_user: Authenticated user resolved from token.
+
+    Returns:
+        Updated user profile with avatar URL.
+
+    Raises:
+        HTTPException: If user is not admin.
+    """
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
