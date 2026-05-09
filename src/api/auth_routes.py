@@ -351,6 +351,60 @@ async def validate_password_reset_token(token: str, db: AsyncSession = Depends(g
     )
 
 
+@router.post(RESET_PASSWORD_CONFIRM_PATH, status_code=status.HTTP_200_OK)
+async def confirm_password_reset(body: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
+    """
+    Reset user password using JSON payload and reset token.
+
+    Args:
+        body: Password reset confirmation payload.
+        db: Active asynchronous database session.
+
+    Returns:
+        Success message payload.
+
+    Raises:
+        HTTPException: If token or payload validation fails.
+    """
+    if body.password != body.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password and confirm password do not match",
+        )
+
+    token_repository = TokenRepository(db)
+    active_token = await token_repository.get_active_token(body.token, TokenType.PASSWORD_RESET)
+    if active_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token is invalid, expired, or already used",
+        )
+
+    token_email, token_user_id = auth_service.decode_password_reset_token(body.token)
+    if token_user_id != body.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token does not belong to provided user",
+        )
+
+    user_repository = UserRepository(db)
+    user = await user_repository.get_user_by_id(body.user_id)
+    if user is None or user.email != token_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User for this token was not found",
+        )
+
+    hashed_password = get_password_hash(body.password)
+    user_id = user.id
+    await user_repository.update_password(user, hashed_password)
+    await token_repository.delete_token(active_token)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
+    await token_repository.delete_user_tokens_by_type(user_id, TokenType.REFRESH)
+
+    return {"message": "Password has been reset successfully"}
+
+
 @router.post(f"{RESET_PASSWORD_PATH}/{{token}}", status_code=status.HTTP_200_OK, response_class=HTMLResponse)
 async def submit_password_reset_form(
     token: str,
@@ -439,57 +493,3 @@ async def submit_password_reset_form(
             message="Password has been reset successfully. You can close this page and log in.",
         )
     )
-
-
-@router.post(RESET_PASSWORD_CONFIRM_PATH, status_code=status.HTTP_200_OK)
-async def confirm_password_reset(body: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
-    """
-    Reset user password using JSON payload and reset token.
-
-    Args:
-        body: Password reset confirmation payload.
-        db: Active asynchronous database session.
-
-    Returns:
-        Success message payload.
-
-    Raises:
-        HTTPException: If token or payload validation fails.
-    """
-    if body.password != body.confirm_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password and confirm password do not match",
-        )
-
-    token_repository = TokenRepository(db)
-    active_token = await token_repository.get_active_token(body.token, TokenType.PASSWORD_RESET)
-    if active_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password reset token is invalid, expired, or already used",
-        )
-
-    token_email, token_user_id = auth_service.decode_password_reset_token(body.token)
-    if token_user_id != body.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token does not belong to provided user",
-        )
-
-    user_repository = UserRepository(db)
-    user = await user_repository.get_user_by_id(body.user_id)
-    if user is None or user.email != token_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User for this token was not found",
-        )
-
-    hashed_password = get_password_hash(body.password)
-    user_id = user.id
-    await user_repository.update_password(user, hashed_password)
-    await token_repository.delete_token(active_token)
-    await token_repository.delete_user_tokens_by_type(user_id, TokenType.ACCESS)
-    await token_repository.delete_user_tokens_by_type(user_id, TokenType.REFRESH)
-
-    return {"message": "Password has been reset successfully"}
