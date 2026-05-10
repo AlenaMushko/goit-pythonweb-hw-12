@@ -1,26 +1,23 @@
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    POSTGRES_CONTAINER_NAME: str
-
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    # Used by docker-compose naming only; DATABASE_URL drives the real connection.
+    POSTGRES_CONTAINER_NAME: str = "n/a"
+    POSTGRES_USER: str = "n/a"
+    POSTGRES_PASSWORD: str = "n/a"
+    POSTGRES_DB: str = "n/a"
 
     POSTGRES_PORT: str = "5432"
 
     DATABASE_URL: str
-    REDIS_HOST: str = "127.0.0.1"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
-    REDIS_PASSWORD: str | None = None
+    REDIS_URL: str
     REDIS_USER_CACHE_TTL_SECONDS: int = 3600
 
-    APP_CONTAINER_NAME: str
-    APP_HOST: str
+    APP_CONTAINER_NAME: str = "n/a"
+    APP_HOST: str = "0.0.0.0"
     APP_PORT: str = "8003"
 
     FRONTEND_ORIGIN: str = "*"
@@ -55,12 +52,17 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
 
-    @property
-    def REDIS_URL(self) -> str:
-        """Build redis connection URL from settings."""
-        if self.REDIS_PASSWORD:
-            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: object) -> object:
+        """Fly Postgres attach uses postgres://; SQLAlchemy async needs asyncpg scheme."""
+        if not isinstance(v, str):
+            return v
+        if v.startswith("postgres://"):
+            return "postgresql+asyncpg://" + v.removeprefix("postgres://")
+        if v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+            return "postgresql+asyncpg://" + v.removeprefix("postgresql://")
+        return v
 
 
 settings = Settings()

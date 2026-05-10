@@ -66,10 +66,7 @@ services:
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       TOKEN_CLEANUP_INTERVAL_SECONDS: ${TOKEN_CLEANUP_INTERVAL_SECONDS:-604800}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_DB: ${REDIS_DB:-0}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-change_me_redis_password}@redis:6379/0}
       REDIS_USER_CACHE_TTL_SECONDS: ${REDIS_USER_CACHE_TTL_SECONDS:-3600}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-hw10}
     volumes:

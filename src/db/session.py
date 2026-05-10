@@ -15,7 +15,10 @@ class DatabaseSessionManager:
         """Create engine and sessionmaker for provided database URL."""
         self._engine: AsyncEngine | None = create_async_engine(url)
         self._session_maker: async_sessionmaker = async_sessionmaker(
-            autoflush=False, autocommit=False, bind=self._engine
+            autoflush=False,
+            autocommit=False,
+            expire_on_commit=False,
+            bind=self._engine,
         )
 
     @contextlib.asynccontextmanager
